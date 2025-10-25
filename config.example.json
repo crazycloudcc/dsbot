@@ -1,0 +1,37 @@
+{
+    "comment": "配置文件示例 - 请复制为 config.json 并填入真实的 API 密钥",
+    "trading": {
+        "symbolA": "BTC",
+        "symbolB": "USDT",
+        "amount": 200,
+        "leverage": 10,
+        "timeframe": "15m",
+        "test_mode": true,
+        "data_points": 100,
+        "schedule_interval_minutes": 15,
+        "trading_mode": "futures",
+        "risk_management": {
+            "enable_stop_loss": true,
+            "enable_take_profit": true,
+            "stop_loss_percent": 1.5,
+            "take_profit_percent": 3.0,
+            "enable_trailing_stop": true,
+            "trailing_stop_distance": 1.5,
+            "check_interval_seconds": 10
+        }
+    },
+    "api": {
+        "exchange_type": "okx",
+        "deepseek_api_key": "YOUR_DEEPSEEK_API_KEY_HERE",
+        "deepseek_base_url": "https://api.deepseek.com",
+        "okx_api_key": "YOUR_OKX_API_KEY_HERE",
+        "okx_secret": "YOUR_OKX_SECRET_HERE",
+        "okx_password": "YOUR_OKX_PASSWORD_HERE"
+    },
+    "logging": {
+        "log_level_console": "DEBUG",
+        "log_level_file": "DEBUG",
+        "log_dir": "logs",
+        "enable_file_logging": true
+    }
+}
