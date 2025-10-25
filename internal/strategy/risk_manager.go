@@ -147,7 +147,24 @@ func (rm *RiskManager) calculateStopLossTakeProfit(pos *models.Position) {
 
 	// 初始化移动止损价格
 	if cfg.EnableTrailingStop {
-		pos.TrailingStop = pos.StopLoss
+		// 【修复】如果固定止损未启用或为0，独立计算移动止损初始值
+		if !cfg.EnableStopLoss || pos.StopLoss == 0 {
+			if pos.Side == "long" {
+				// 多仓：移动止损在开仓价下方
+				pos.TrailingStop = pos.EntryPrice * (1 - cfg.TrailingStopDistance/100)
+				logger.Printf("[风险管理] 移动止损独立初始化(多仓) - 开仓价:%.2f, 移动止损:%.2f",
+					pos.EntryPrice, pos.TrailingStop)
+			} else if pos.Side == "short" {
+				// 空仓：移动止损在开仓价上方
+				pos.TrailingStop = pos.EntryPrice * (1 + cfg.TrailingStopDistance/100)
+				logger.Printf("[风险管理] 移动止损独立初始化(空仓) - 开仓价:%.2f, 移动止损:%.2f",
+					pos.EntryPrice, pos.TrailingStop)
+			}
+		} else {
+			// 使用固定止损作为移动止损初始值
+			pos.TrailingStop = pos.StopLoss
+			logger.Printf("[风险管理] 移动止损继承固定止损 - 止损价:%.2f", pos.TrailingStop)
+		}
 	}
 }
 
@@ -215,7 +232,7 @@ func (rm *RiskManager) checkPosition() {
 	}
 
 	logger.Debugf("[风险管理] 当前浮动盈亏: %.2f USDT (%.2f%%), 止损阈值: %.2f%%",
-		currentPnL, pnlPercent, rm.config.Trading.RiskManagement.StopLossPercent)
+		currentPnL/100, pnlPercent, rm.config.Trading.RiskManagement.StopLossPercent)
 	rm.mu.Unlock()
 
 	// 更新最高价和最低价
@@ -275,22 +292,22 @@ func (rm *RiskManager) shouldClosePosition(pos *models.Position, currentPrice fl
 	if pos.Side == "long" {
 		// 多仓止损：价格跌破止损线
 		if cfg.EnableStopLoss {
-			// 优先检查移动止损
-			if cfg.EnableTrailingStop && currentPrice <= pos.TrailingStop {
+			// 优先检查移动止损（必须 > 0 才有效）
+			if cfg.EnableTrailingStop && pos.TrailingStop > 0 && currentPrice <= pos.TrailingStop {
 				logger.Printf("[风险管理] ⚠️ 触发移动止损 - 当前价:%.2f <= 移动止损:%.2f",
 					currentPrice, pos.TrailingStop)
 				return true
 			}
-			// 检查固定止损
-			if currentPrice <= pos.StopLoss {
+			// 检查固定止损（必须 > 0 才有效）
+			if pos.StopLoss > 0 && currentPrice <= pos.StopLoss {
 				logger.Printf("[风险管理] ⚠️ 触发止损 - 当前价:%.2f <= 止损价:%.2f",
 					currentPrice, pos.StopLoss)
 				return true
 			}
 		}
 
-		// 多仓止盈：价格涨破止盈线
-		if cfg.EnableTakeProfit && currentPrice >= pos.TakeProfit {
+		// 多仓止盈：价格涨破止盈线（必须 > 0 才有效）
+		if cfg.EnableTakeProfit && pos.TakeProfit > 0 && currentPrice >= pos.TakeProfit {
 			logger.Printf("[风险管理] ✅ 触发止盈 - 当前价:%.2f >= 止盈价:%.2f",
 				currentPrice, pos.TakeProfit)
 			return true
@@ -299,22 +316,22 @@ func (rm *RiskManager) shouldClosePosition(pos *models.Position, currentPrice fl
 	} else if pos.Side == "short" {
 		// 空仓止损：价格涨破止损线
 		if cfg.EnableStopLoss {
-			// 优先检查移动止损
-			if cfg.EnableTrailingStop && currentPrice >= pos.TrailingStop {
+			// 优先检查移动止损（必须 > 0 才有效）
+			if cfg.EnableTrailingStop && pos.TrailingStop > 0 && currentPrice >= pos.TrailingStop {
 				logger.Printf("[风险管理] ⚠️ 触发移动止损 - 当前价:%.2f >= 移动止损:%.2f",
 					currentPrice, pos.TrailingStop)
 				return true
 			}
-			// 检查固定止损
-			if currentPrice >= pos.StopLoss {
+			// 检查固定止损（必须 > 0 才有效）
+			if pos.StopLoss > 0 && currentPrice >= pos.StopLoss {
 				logger.Printf("[风险管理] ⚠️ 触发止损 - 当前价:%.2f >= 止损价:%.2f",
 					currentPrice, pos.StopLoss)
 				return true
 			}
 		}
 
-		// 空仓止盈：价格跌破止盈线
-		if cfg.EnableTakeProfit && currentPrice <= pos.TakeProfit {
+		// 空仓止盈：价格跌破止盈线（必须 > 0 才有效）
+		if cfg.EnableTakeProfit && pos.TakeProfit > 0 && currentPrice <= pos.TakeProfit {
 			logger.Printf("[风险管理] ✅ 触发止盈 - 当前价:%.2f <= 止盈价:%.2f",
 				currentPrice, pos.TakeProfit)
 			return true
@@ -375,7 +392,7 @@ func (rm *RiskManager) closePosition(pos *models.Position, currentPrice float64)
 		pnlPercent = (pnl / margin) * 100
 	}
 
-	logger.Printf("[风险管理] ✅ 平仓成功 - 盈亏: %.2f USDT (%.2f%%)", pnl, pnlPercent)
+	logger.Printf("[风险管理] ✅ 平仓成功 - 盈亏: %.2f USDT (%.2f%%)", pnl/100, pnlPercent)
 
 	// 获取最新余额
 	time.Sleep(1 * time.Second)
