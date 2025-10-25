@@ -231,8 +231,15 @@ func (rm *RiskManager) checkPosition() {
 		pnlPercent = (currentPnL / margin) * 100
 	}
 
-	logger.Debugf("[风险管理] 当前浮动盈亏: %.2f USDT (%.2f%%), 止损阈值: %.2f%%",
-		currentPnL/100, pnlPercent, rm.config.Trading.RiskManagement.StopLossPercent)
+	// 计算止损阈值（负数表示亏损）
+	stopLossThreshold := -rm.config.Trading.RiskManagement.StopLossPercent
+	stopLossUSDT := margin * (stopLossThreshold / 100)
+
+	// 计算距离止损还有多少空间
+	distanceToStopLoss := pnlPercent - stopLossThreshold
+
+	logger.Debugf("[风险管理] 当前浮动盈亏: %.2f USDT (%.2f%%), 止损阈值: %.2f%% (%.2f USDT), 距离止损: %.2f%%",
+		currentPnL/100, pnlPercent, stopLossThreshold, stopLossUSDT/100, distanceToStopLoss)
 	rm.mu.Unlock()
 
 	// 更新最高价和最低价
